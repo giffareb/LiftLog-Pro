@@ -135,7 +135,7 @@ export function Workouts() {
                     </div>
                     <div>
                       <CardTitle className="text-sm font-semibold text-foreground">
-                        {workout.workout_templates ? (Array.isArray(workout.workout_templates) ? workout.workout_templates[0]?.name : workout.workout_templates.name) : 'Custom Workout'}
+                        {workout.workout_templates ? (Array.isArray(workout.workout_templates) ? workout.workout_templates[0]?.name : workout.workout_templates.name) : (workout.workout_sessions?.length === 0 && workout.notes ? 'Rest Day / Journal' : 'Custom Workout')}
                       </CardTitle>
                       <CardDescription className="text-xs text-muted-foreground mt-0.5 whitespace-nowrap">
                         {new Date(workout.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}

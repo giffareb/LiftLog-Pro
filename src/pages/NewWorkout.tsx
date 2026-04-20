@@ -152,7 +152,9 @@ export function NewWorkout() {
   // Save Workout
   const saveWorkout = async () => {
     if (!user) return
-    if (workoutGroups.length === 0) return toast.error("Please add at least one exercise.")
+    if (workoutGroups.length === 0 && !workoutNotes.trim()) {
+      return toast.error("Please add at least one exercise or write some notes for today.")
+    }
     
     // Validate
     for (const group of workoutGroups) {
@@ -252,7 +254,7 @@ export function NewWorkout() {
           <h1 className="text-3xl font-bold tracking-tight">{isEditMode ? "Edit Workout" : "New Workout"}</h1>
           <p className="text-muted-foreground mt-2">Log your sets, reps, and weights.</p>
         </div>
-        <Button onClick={saveWorkout} disabled={isSaving || workoutGroups.length === 0} className="font-semibold">
+        <Button onClick={saveWorkout} disabled={isSaving || (workoutGroups.length === 0 && !workoutNotes.trim())} className="font-semibold">
           {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
           {isEditMode ? "Save Changes" : "Finish"}
         </Button>
@@ -293,7 +295,7 @@ export function NewWorkout() {
           </div>
           <textarea
             className="w-full bg-black/20 border border-border rounded-md p-3 text-sm text-foreground focus:outline-none focus:border-primary min-h-[80px]"
-            placeholder="General workout notes (e.g., Target: 60 mins, Deload week...)"
+            placeholder="How's your body feeling? (e.g., Rest day, slept 6h, walked 10k, ate TDEE)"
             value={workoutNotes}
             onChange={(e) => setWorkoutNotes(e.target.value)}
           />
@@ -306,7 +308,10 @@ export function NewWorkout() {
             <CardContent className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
               <Dumbbell className="w-12 h-12 mb-4 opacity-20" />
               <p>Your workout is empty.</p>
-              <Button variant="outline" className="mt-4 border-border" onClick={addExercise}>
+              <p className="text-xs mt-2 max-w-sm">
+                You can save this without exercises as a <b>"Rest Day / Journal"</b> using the notes above, or add an exercise below to start tracking weights.
+              </p>
+              <Button variant="outline" className="mt-5 border-border" onClick={addExercise}>
                 <Plus className="w-4 h-4 mr-2" /> Add First Exercise
               </Button>
             </CardContent>
