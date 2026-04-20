@@ -22,23 +22,35 @@ const ai = new GoogleGenAI({ apiKey })
 
 export function AICoach() {
   const { user } = useAuth()
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'model',
-      content: 'สวัสดีครับ! ผมคือ LiftBot โค้ช AI ส่วนตัวของคุณ มีอะไรให้ผมช่วยแนะนำหรือวิเคราะห์จากสถิติการฝึกของคุณในช่วง 14 วันที่ผ่านมาไหมครับ?'
-    }
-  ])
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
+  const [resetTrigger, setResetTrigger] = useState(0)
   const chatRef = useRef<any>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const initialGreeting: Message = {
+    id: '1',
+    role: 'model',
+    content: 'สวัสดีครับ! ผมคือ LiftBot โค้ช AI ส่วนตัวของคุณ มีอะไรให้ผมช่วยแนะนำหรือวิเคราะห์จากสถิติการฝึกของคุณในช่วง 14 วันที่ผ่านมาไหมครับ?'
+  }
 
   useEffect(() => {
     async function initChat() {
       if (!user) return
       setIsInitializing(true)
+      
+      const storageKey = `liftlog_ai_messages_${user.id}`
+      const saved = localStorage.getItem(storageKey)
+      let loadedMessages: Message[] = [initialGreeting]
+      if (saved) {
+        try {
+          loadedMessages = JSON.parse(saved)
+        } catch(e) {}
+      }
+      setMessages(loadedMessages)
+      
       try {
         // Fetch last 14 days of workout data
         const fourteenDaysAgo = format(subDays(new Date(), 14), 'yyyy-MM-dd')
@@ -105,11 +117,19 @@ ${workoutContext}
 =========================================
 อ้างอิงข้อมูลนี้เมื่อ User ถามถึงสถิติ, ความก้าวหน้า, เรื่องอาหาร(Diet), วันพัก(Rest Days), หรือขอคำแนะนำ`
 
+        const history = loadedMessages
+          .filter(m => m.id !== '1') // Skip the local initial greeting in the API history
+          .map(m => ({
+            role: m.role,
+            parts: [{ text: m.content }]
+          }))
+
         chatRef.current = ai.chats.create({
           model: 'gemini-3-flash-preview',
           config: {
             systemInstruction
-          }
+          },
+          history: history.length > 0 ? history : undefined
         })
       } catch (err) {
         console.error("Failed to fetch context, falling back to default", err)
@@ -125,14 +145,26 @@ ${workoutContext}
     }
 
     initChat()
-  }, [user])
+  }, [user, resetTrigger])
 
   useEffect(() => {
     // Scroll to bottom on new message
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [messages])
+    // Save to local storage
+    if (user && messages.length > 0) {
+      localStorage.setItem(`liftlog_ai_messages_${user.id}`, JSON.stringify(messages))
+    }
+  }, [messages, user])
+
+  const clearChat = () => {
+    if (!user) return
+    localStorage.removeItem(`liftlog_ai_messages_${user.id}`)
+    setMessages([initialGreeting])
+    setResetTrigger(prev => prev + 1)
+    toast.success("ล้างประวัติการสนทนาแล้ว")
+  }
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -163,9 +195,14 @@ ${workoutContext}
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto pb-10 h-[calc(100vh-140px)] flex flex-col">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">AI Coach</h1>
-        <p className="text-muted-foreground mt-2">โค้ชส่วนตัวของคุณ พร้อมวิเคราะห์การฝึก</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">AI Coach</h1>
+          <p className="text-muted-foreground mt-2">โค้ชส่วนตัวของคุณ พร้อมวิเคราะห์การฝึก</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={clearChat} className="text-xs border-border mt-1 text-muted-foreground hover:text-white">
+          เคลียร์แชท
+        </Button>
       </div>
 
       <Card className="flex-1 flex flex-col overflow-hidden border-border shadow-none rounded-xl relative">
@@ -179,15 +216,24 @@ ${workoutContext}
         <ScrollArea messages={messages} isLoading={isLoading} scrollRef={scrollRef} />
         
         <div className="p-3 border-t border-border bg-card">
-          <form onSubmit={sendMessage} className="flex gap-2">
-            <Input
+          <form onSubmit={sendMessage} className="flex gap-2 items-end">
+            <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="ถามเกี่ยวกับเทคนิค, อาหาร, หรือสถิติที่ผ่านมา..."
-              className="flex-1"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  if (!isLoading && input.trim() && !isInitializing) {
+                    sendMessage(e as any)
+                  }
+                }
+              }}
+              placeholder="ถามโค้ช... (Shift+Enter ขึ้นบรรทัดใหม่)"
+              className="flex-1 bg-transparent border border-input rounded-md px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:border-primary min-h-[40px] max-h-[150px] resize-none"
+              rows={input.split('\n').length > 1 ? Math.min(input.split('\n').length, 5) : 1}
               disabled={isLoading || isInitializing}
             />
-            <Button type="submit" disabled={isLoading || !input.trim() || isInitializing}>
+            <Button type="submit" disabled={isLoading || !input.trim() || isInitializing} className="h-10 shrink-0">
               {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
             </Button>
           </form>
