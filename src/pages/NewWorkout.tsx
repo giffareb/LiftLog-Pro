@@ -12,8 +12,13 @@ import { useQuery } from '@tanstack/react-query'
 
 type Exercise = { id: string; name: string; category: string }
 type Template = { id: string; name: string; description: string }
-type SetInput = { reps: number | ''; weight: number | ''; is_dropset: boolean }
-type ExerciseGroup = { exercise_id: string; sets: SetInput[]; notes: string }
+type SetInput = { reps: number | ''; weight: number | ''; is_dropset: boolean; side_l: boolean; side_r: boolean }
+type ExerciseGroup = { 
+  exercise_id: string; 
+  sets: SetInput[]; 
+  notes: string;
+  style?: 'standard' | 'dual' | 'bodyweight'
+}
 
 export function NewWorkout() {
   const { user } = useAuth()
@@ -80,19 +85,41 @@ export function NewWorkout() {
         
         for (const eid of Object.keys(groupedByExId)) {
           const sessions = groupedByExId[eid]
-          const sets = sessions.map(s => ({
-            reps: s.reps || '',
-            weight: s.weight || '',
-            is_dropset: s.is_dropset || false
-          }))
-          
-          // Original logic stored notes on the first set only
           const notes = sessions[0]?.notes || ''
+          
+          let style: 'standard' | 'dual' | 'bodyweight' = 'standard'
+          if (notes.includes('[Dumbbell คู่]')) style = 'dual'
+          else if (notes.includes('[Bodyweight]')) style = 'bodyweight'
+          
+          const sets = sessions.map(s => {
+            const setNotes = s.notes || ''
+            return {
+              reps: s.reps || '',
+              weight: s.weight || '',
+              is_dropset: s.is_dropset || false,
+              side_l: setNotes.includes('[L,R]') || setNotes.includes('[L]'),
+              side_r: setNotes.includes('[L,R]') || setNotes.includes('[R]')
+            }
+          })
+
+          const cleanNotes = notes
+            .replace(/\[Dumbbell คู่\]/g, '')
+            .replace(/\[Bodyweight\]/g, '')
+            .replace(/\[Isolate ทีละข้าง\]/g, '')
+            .replace(/\[Isolate\]/g, '')
+            .replace(/\[Alt\. สลับซ้ายขวา\]/g, '')
+            .replace(/\[สลับข้าง\]/g, '')
+            .replace(/\[ทีละข้าง\]/g, '')
+            .replace(/\[L,R\]/g, '')
+            .replace(/\[L\]/g, '')
+            .replace(/\[R\]/g, '')
+            .trim()
           
           newGroups.push({
             exercise_id: eid,
             sets: sets,
-            notes: notes
+            notes: cleanNotes,
+            style: style
           })
         }
         
@@ -107,7 +134,12 @@ export function NewWorkout() {
   // Add a new exercise to the workout
   const addExercise = () => {
     if (exercises.length === 0) return toast.error("No exercises found in database.")
-    setWorkoutGroups([...workoutGroups, { exercise_id: exercises[0].id, sets: [{ reps: '', weight: '', is_dropset: false }], notes: '' }])
+    setWorkoutGroups([...workoutGroups, { 
+      exercise_id: exercises[0].id, 
+      sets: [{ reps: '', weight: '', is_dropset: false, side_l: false, side_r: false }], 
+      notes: '',
+      style: 'standard'
+    }])
   }
 
   // Remove an exercise
@@ -118,7 +150,7 @@ export function NewWorkout() {
   // Add a set to an exercise
   const addSet = (groupIndex: number) => {
     const newGroups = [...workoutGroups]
-    newGroups[groupIndex].sets.push({ reps: '', weight: '', is_dropset: false })
+    newGroups[groupIndex].sets.push({ reps: '', weight: '', is_dropset: false, side_l: false, side_r: false })
     setWorkoutGroups(newGroups)
   }
 
@@ -149,6 +181,12 @@ export function NewWorkout() {
     setWorkoutGroups(newGroups)
   }
 
+  const updateExerciseStyle = (groupIndex: number, style: 'standard' | 'dual' | 'bodyweight') => {
+    const newGroups = [...workoutGroups]
+    newGroups[groupIndex].style = style
+    setWorkoutGroups(newGroups)
+  }
+
   // Save Workout
   const saveWorkout = async () => {
     if (!user) return
@@ -168,7 +206,7 @@ export function NewWorkout() {
       let workoutData = null
       
       if (isEditMode && editWorkoutId) {
-        // Update Workout Record
+        // ... (update workout logic)
         const { data: updatedData, error: workoutError } = await supabase
           .from('workouts')
           .update({ 
@@ -220,8 +258,21 @@ export function NewWorkout() {
       // 2. Prepare Sessions (Sets)
       const sessionsToInsert = []
       for (const group of workoutGroups) {
+        let styleNote = ""
+        if (group.style === 'dual') styleNote = "[Dumbbell คู่] "
+        if (group.style === 'bodyweight') styleNote = "[Bodyweight] "
+
         for (let idx = 0; idx < group.sets.length; idx++) {
           const set = group.sets[idx]
+          
+          let sideTags = ""
+          if (set.side_l && set.side_r) sideTags = "[L,R] "
+          else if (set.side_l) sideTags = "[L] "
+          else if (set.side_r) sideTags = "[R] "
+
+          let firstSetNote = idx === 0 ? `${styleNote}${group.notes}`.trim() : ""
+          let combinedNotes = `${firstSetNote} ${sideTags}`.trim()
+
           sessionsToInsert.push({
             workout_id: workoutData.id,
             exercise_id: group.exercise_id,
@@ -229,7 +280,7 @@ export function NewWorkout() {
             reps: Number(set.reps),
             weight: Number(set.weight),
             is_dropset: set.is_dropset,
-            notes: idx === 0 ? group.notes : null // Store exercise-level notes on the first set only
+            notes: combinedNotes ? combinedNotes : null
           })
         }
       }
@@ -340,31 +391,67 @@ export function NewWorkout() {
                 <StickyNote className="w-3.5 h-3.5 text-muted-foreground mt-0.5 mr-2 shrink-0" />
                 <input 
                   type="text" 
-                  className="bg-transparent border-none text-xs text-muted-foreground w-full focus:outline-none" 
-                  placeholder="Notes (e.g., Dropset 27kg -> 20reps, Tempo 3 sec)"
+                  className="bg-transparent border-none text-xs text-muted-foreground w-full focus:outline-none placeholder:text-muted-foreground/50" 
+                  placeholder="Notes (e.g., Tempo 3 sec, Focus on peak contraction)"
                   value={group.notes}
                   onChange={(e) => updateExerciseNotes(groupIdx, e.target.value)}
                 />
               </div>
+              <div className="flex gap-1 flex-wrap mt-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className={`h-7 px-2 text-[10px] uppercase font-bold border-border/50 ${(!group.style || group.style === 'standard') ? 'bg-primary/20 text-primary border-primary/30' : 'text-muted-foreground'}`}
+                  onClick={() => updateExerciseStyle(groupIdx, 'standard')}
+                  title="ใช้อุปกรณ์ 1 ชิ้นรวมกัน เช่น บาร์เบล หรือ แมชชีน"
+                >
+                  Standard
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className={`h-7 px-2 text-[10px] uppercase font-bold border-border/50 ${group.style === 'dual' ? 'bg-green-500/20 text-green-500 border-green-500/30' : 'text-muted-foreground'}`}
+                  onClick={() => updateExerciseStyle(groupIdx, 'dual')}
+                  title="ถือดัมเบลสองข้างพร้อมกัน และเล่นพร้อมกัน"
+                >
+                  Dumbbell คู่
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className={`h-7 px-2 text-[10px] uppercase font-bold border-border/50 ${group.style === 'bodyweight' ? 'bg-blue-500/20 text-blue-500 border-blue-500/30' : 'text-muted-foreground'}`}
+                  onClick={() => {
+                    updateExerciseStyle(groupIdx, 'bodyweight')
+                    // Automatically set weights to 0 for BW
+                    const newGroups = [...workoutGroups]
+                    newGroups[groupIdx].sets = newGroups[groupIdx].sets.map(s => ({ ...s, weight: 0 }))
+                    setWorkoutGroups(newGroups)
+                  }}
+                  title="ใช้น้ำหนักตัวในการฝึก (ไม่ต้องใส่น้ำหนัก)"
+                >
+                  Bodyweight
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="grid grid-cols-[30px_1fr_1fr_60px_40px] gap-3 p-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/50">
+              <div className="grid grid-cols-[30px_1fr_1fr_40px_70px_40px] gap-2 p-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/50">
                 <div>Set</div>
                 <div>Weight (kg)</div>
                 <div>Reps</div>
                 <div className="text-center">DS</div>
+                <div className="text-center">L / R</div>
                 <div></div>
               </div>
               
               <div className="flex flex-col">
                 {group.sets.map((set, setIdx) => (
-                  <div key={setIdx} className={`grid grid-cols-[30px_1fr_1fr_60px_40px] gap-3 p-3 items-center border-b border-border/50 last:border-0 ${set.is_dropset ? 'bg-primary/5' : ''}`}>
+                  <div key={setIdx} className={`grid grid-cols-[30px_1fr_1fr_40px_70px_40px] gap-2 p-3 items-center border-b border-border/50 last:border-0 ${set.is_dropset ? 'bg-primary/5' : ''}`}>
                     <div className="text-center font-mono text-xs text-muted-foreground flex items-center justify-center">
                       <span className="w-5 h-5 rounded-full bg-border/50 flex items-center justify-center">{setIdx + 1}</span>
                     </div>
                     <div>
                       <Input type="number" 
-                        className="h-8 bg-black/20 border-border font-mono text-sm" 
+                        className="h-8 bg-black/20 border-border font-mono text-sm px-2" 
                         placeholder="0" 
                         value={set.weight} 
                         onChange={(e) => updateSet(groupIdx, setIdx, 'weight', e.target.value)} 
@@ -372,7 +459,7 @@ export function NewWorkout() {
                     </div>
                     <div>
                       <Input type="number" 
-                        className="h-8 bg-black/20 border-border font-mono text-sm" 
+                        className="h-8 bg-black/20 border-border font-mono text-sm px-2" 
                         placeholder="0" 
                         value={set.reps} 
                         onChange={(e) => updateSet(groupIdx, setIdx, 'reps', e.target.value)} 
@@ -384,6 +471,24 @@ export function NewWorkout() {
                         onCheckedChange={(c) => updateSet(groupIdx, setIdx, 'is_dropset', !!c)} 
                         className="border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       />
+                    </div>
+                    <div className="flex justify-center items-center gap-1.5">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground font-medium">L</span>
+                        <Checkbox 
+                          checked={set.side_l} 
+                          onCheckedChange={(c) => updateSet(groupIdx, setIdx, 'side_l', !!c)} 
+                          className="w-3.5 h-3.5 border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground font-medium">R</span>
+                        <Checkbox 
+                          checked={set.side_r} 
+                          onCheckedChange={(c) => updateSet(groupIdx, setIdx, 'side_r', !!c)} 
+                          className="w-3.5 h-3.5 border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                      </div>
                     </div>
                     <div className="flex justify-end">
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => removeSet(groupIdx, setIdx)}>
