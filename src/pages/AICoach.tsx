@@ -52,10 +52,10 @@ export function AICoach() {
       setMessages(loadedMessages)
       
       try {
-        // Fetch last 14 days of workout data
-        const fourteenDaysAgo = format(subDays(new Date(), 14), 'yyyy-MM-dd')
+        // Fetch last 30 days of workout data for better progression analysis
+        const thirtyDaysAgo = format(subDays(new Date(), 30), 'yyyy-MM-dd')
         
-        const { data: rawWorkouts, error } = await supabase
+        const { data: rawWorkouts, error: workoutError } = await supabase
           .from('workouts')
           .select(`
             id, date, notes,
@@ -65,12 +65,20 @@ export function AICoach() {
             )
           `)
           .eq('user_id', user.id)
-          .gte('date', fourteenDaysAgo)
+          .gte('date', thirtyDaysAgo)
           .order('date', { ascending: false })
 
-        let workoutContext = 'ยังไม่มีประวัติการออกกำลังกายในช่วง 14 วันที่ผ่านมา'
+        // Fetch last 12 monthly summaries for long-term context
+        const { data: summaries, error: summaryError } = await supabase
+          .from('monthly_summaries')
+          .select('month, summary_text')
+          .eq('user_id', user.id)
+          .order('month', { ascending: false })
+          .limit(12)
+
+        let workoutContext = 'ยังไม่มีประวัติการออกกำลังกายในช่วง 30 วันที่ผ่านมา'
         
-        if (!error && rawWorkouts && rawWorkouts.length > 0) {
+        if (!workoutError && rawWorkouts && rawWorkouts.length > 0) {
           workoutContext = rawWorkouts.map((w: any) => {
             let res = `วันที่: ${w.date} ${w.notes ? `(บันทึก: ${w.notes})` : ''}\n`
             
@@ -96,6 +104,11 @@ export function AICoach() {
           }).join('\n\n')
         }
 
+        let summaryContext = 'ยังไม่มีประวัติรายงานรายเดือน'
+        if (!summaryError && summaries && summaries.length > 0) {
+          summaryContext = summaries.map(s => `[Month: ${s.month}]\n${s.summary_text}`).join('\n\n')
+        }
+
         const profileText = user.user_metadata ? `
 ข้อมูลส่วนตัวผู้ใช้ (Profile):
 - อายุ: ${user.user_metadata.age || 'ไม่ระบุ'} ปี
@@ -113,7 +126,9 @@ export function AICoach() {
 1. คุณต้องตอบสนองเป็น "ภาษาไทย" เสมอ ไม่ว่าจะได้รับคำถามภาษาอะไร
 2. ให้คำแนะนำที่กระชับ ปฏิบัติได้จริง ให้กำลังใจและเป็นกันเอง ไม่เกริ่นนำยาวเกินไป
 3. รูปแบบการตอบ: ใช้ Markdown headers, ตัวหนา, และลิสต์เพื่อทำให้คำแนะนำอ่านง่าย
-4. วิเคราะห์ข้อมูลการฝึกของ User (ย้อนหลัง 14 วัน) และ Profile เพื่อให้คำแนะนำเฉพาะบุคคล รวมถึงประเมินว่ามีการพักผ่อน(Rest) หรือความถี่ในการฝึกที่เหมาะสมหรือไม่ โดยดูจากวันที่(Date) ที่บันทึกไว้
+4. วิเคราะห์ข้อมูลการฝึกของ User จาก 2 แหล่งข้อมูล:
+   - รายละเอียดรายวัน (ย้อนหลัง 30 วัน): สำหรับดูความสดใหม่และความล้าปัจจุบัน
+   - สรุปรายงานรายเดือน (ย้อนหลังสูงสุด 12 เดือน): สำหรับดูแนวโน้มและพัฒนาการระยะยาวทั้งปี
 5. ผู้ใช้กรอกน้ำหนักโดยยึด "ตัวเลขบนอุปกรณ์ 1 ชิ้น/ข้าง" เป็นหลัก ในโน้ตอาจจะมีแท็กบอกรูปแบบการยก ให้คุณตีความปริมาณโหลดยังไง:
    - ไม่มีแท็ก (Standard): อุปกรณ์ชิ้นเดียว เล่นรวม (เช่น Barbell)
    - [Dumbbell คู่]: ถือสองข้างและยกพร้อมกัน (หมายถึง น้ำหนักที่กรอกคือข้างเดียว น้ำหนักรวม=คูณสอง)
@@ -121,11 +136,15 @@ export function AICoach() {
    และในเซต/แถวใดที่มีติ๊ก [L] หรือ [R] หมายถึงการเล่นแบบแยกข้าง (Isolate) ให้คุณวิเคราะห์ความหนักตามความเหมาะสมของท่าทาง
    ให้นำบริบทนี้ไปคำนวณ ความหนัก(Volume) และความอ่อนล้าให้ถูกต้อง
 ${profileText}
-ข้อมูลประวัติการออกกำลังกาย 14 วันย้อนหลังของ User:
+ข้อมูลประวัติรายงานรายเดือน (High-level History - 12 Months):
+=========================================
+${summaryContext}
+=========================================
+ข้อมูลประวัติการออกกำลังกาย 30 วันล่าสุด (Recent Detailed Logs):
 =========================================
 ${workoutContext}
 =========================================
-อ้างอิงข้อมูลนี้เมื่อ User ถามถึงสถิติ, ความก้าวหน้า, เรื่องอาหาร(Diet), วันพัก(Rest Days), หรือขอคำแนะนำ`
+อ้างอิงข้อมูลทั้งหมดนี้เมื่อ User ถามถึงสถิติ, ความก้าวหน้าทั้งปี, เรื่องอาหาร, วันพัก, หรือขอคำแนะนำ`
 
         const history = loadedMessages
           .filter(m => m.id !== '1') // Skip the local initial greeting in the API history

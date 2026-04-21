@@ -130,6 +130,32 @@ export interface Database {
           created_at?: string
         }
       }
+      monthly_summaries: {
+        Row: {
+          id: string
+          user_id: string
+          month: string // YYYY-MM
+          summary_text: string
+          stats_json: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          month: string
+          summary_text: string
+          stats_json?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          month?: string
+          summary_text?: string
+          stats_json?: Json
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

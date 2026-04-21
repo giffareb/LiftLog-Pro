@@ -1,6 +1,6 @@
 import { Outlet, Navigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { Activity, Calendar, LayoutDashboard, LogOut, PlusCircle, Bot, User, Dumbbell } from 'lucide-react'
+import { Activity, Calendar, LayoutDashboard, LogOut, PlusCircle, Bot, User, Dumbbell, BarChart3 } from 'lucide-react'
 import { Button } from '../components/ui/button'
 
 export function AppLayout() {
@@ -53,6 +53,10 @@ export function AppLayout() {
             <Bot className="h-5 w-5" />
             AI Coach
           </Link>
+          <Link to="/reports" className="flex items-center gap-3 px-3 py-3 rounded-md hover:bg-accent hover:text-accent-foreground text-muted-foreground transition-colors">
+            <BarChart3 className="h-5 w-5" />
+            Monthly Reports
+          </Link>
           <Link to="/profile" className="flex items-center gap-3 px-3 py-3 rounded-md hover:bg-accent hover:text-accent-foreground text-muted-foreground transition-colors">
             <User className="h-5 w-5" />
             Profile
@@ -97,6 +101,10 @@ export function AppLayout() {
         <Link to="/coach" className="flex flex-col items-center text-muted-foreground hover:text-primary transition-colors">
           <Bot className="h-5 w-5" />
           <span className="text-[9px] mt-1 font-medium">Coach</span>
+        </Link>
+        <Link to="/reports" className="flex flex-col items-center text-muted-foreground hover:text-primary transition-colors">
+          <BarChart3 className="h-5 w-5" />
+          <span className="text-[9px] mt-1 font-medium">Report</span>
         </Link>
         <Link to="/profile" className="flex flex-col items-center text-muted-foreground hover:text-primary transition-colors">
           <User className="h-5 w-5" />

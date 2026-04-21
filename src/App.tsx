@@ -11,6 +11,7 @@ import { NewWorkout } from './pages/NewWorkout'
 import { Exercises } from './pages/Exercises'
 import { AICoach } from './pages/AICoach'
 import { Profile } from './pages/Profile'
+import { MonthlyReport } from './pages/MonthlyReport'
 
 const queryClient = new QueryClient()
 
@@ -28,6 +29,7 @@ export default function App() {
               <Route path="/workouts/new" element={<NewWorkout />} />
               <Route path="/exercises" element={<Exercises />} />
               <Route path="/coach" element={<AICoach />} />
+              <Route path="/reports" element={<MonthlyReport />} />
               <Route path="/profile" element={<Profile />} />
             </Route>
           </Routes>

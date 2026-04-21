@@ -5,10 +5,20 @@ import { supabase } from '../lib/supabase/client'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { formatDistanceToNow, subDays, startOfWeek, isSameDay } from 'date-fns'
-import React, { useMemo } from 'react'
+import React, { useMemo, useEffect } from 'react'
+import { generateMonthlySummary } from '../services/summaryService'
 
 export function Dashboard() {
   const { user } = useAuth()
+
+  // Trigger monthly summary check on mount
+  useEffect(() => {
+    if (user) {
+      generateMonthlySummary(user.id).catch(err => {
+        console.error("Failed to generate monthly summary:", err)
+      })
+    }
+  }, [user])
 
   // Fetch all workouts to calculate stats
   const { data: allWorkouts = [], isLoading } = useQuery({

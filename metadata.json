@@ -1,6 +1,6 @@
 {
   "name": "LiftLog Pro",
-  "description": "Web application for tracking workouts with PPL templates, complex sets, and volume calculations.",
+  "description": "Smart AI-Powered Workout Tracker. Log exercises with precision (L/R isolation, DB load types) and get personalized insights from LiftBot, your AI Fitness Coach.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }
