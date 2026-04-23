@@ -5,7 +5,8 @@ import { Database } from '../types/db'
 
 type MonthlySummary = Database['public']['Tables']['monthly_summaries']['Row']
 
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' })
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' && process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY : 'MISSING_API_KEY');
+const genAI = new GoogleGenAI({ apiKey })
 
 export async function generateMonthlySummary(userId: string, targetDate: Date = new Date()) {
   const previousMonth = subMonths(targetDate, 1)

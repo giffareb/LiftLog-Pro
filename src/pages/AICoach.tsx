@@ -106,7 +106,7 @@ export function AICoach() {
 
         let summaryContext = 'ยังไม่มีประวัติรายงานรายเดือน'
         if (!summaryError && summaries && summaries.length > 0) {
-          summaryContext = summaries.map(s => `[Month: ${s.month}]\n${s.summary_text}`).join('\n\n')
+          summaryContext = (summaries as any[]).map(s => `[Month: ${s.month}]\n${s.summary_text}`).join('\n\n')
         }
 
         const profileText = user.user_metadata ? `
@@ -116,6 +116,7 @@ export function AICoach() {
 - ส่วนสูง: ${user.user_metadata.height || 'ไม่ระบุ'} ซม.
 - น้ำหนักปัจจุบัน: ${user.user_metadata.weight || 'ไม่ระบุ'} กก.
 - เปอร์เซ็นต์ไขมันโดยประมาณ: ${user.user_metadata.bodyFat ? user.user_metadata.bodyFat + '%' : 'ไม่ระบุ'}
+- เปอร์เซ็นต์กล้ามเนื้อรวม: ${user.user_metadata.muscleMass ? user.user_metadata.muscleMass + '%' : 'ไม่ระบุ'}
 - เป้าหมายปัจจุบัน: ${user.user_metadata.goal || 'ไม่ระบุ'}
 - การกินอาหารปัจจุบัน: ${user.user_metadata.diet || 'ไม่ระบุ'}
 ` : 'ข้อมูลส่วนตัวผู้ใช้ (Profile): ผู้ใช้ยังไม่ได้ระบุข้อมูลส่วนตัว\n';
@@ -146,19 +147,35 @@ ${workoutContext}
 =========================================
 อ้างอิงข้อมูลทั้งหมดนี้เมื่อ User ถามถึงสถิติ, ความก้าวหน้าทั้งปี, เรื่องอาหาร, วันพัก, หรือขอคำแนะนำ`
 
-        const history = loadedMessages
-          .filter(m => m.id !== '1') // Skip the local initial greeting in the API history
+        // Scrub history to ensure it starts with 'user' and alternates properly
+        const rawHistory = loadedMessages
+          .filter(m => m.id !== '1') // Skip the local initial greeting
           .map(m => ({
             role: m.role,
             parts: [{ text: m.content }]
           }))
+          
+        const validHistory = []
+        let nextExpectedRole = 'user'
+        
+        for (const msg of rawHistory) {
+          if (msg.role === nextExpectedRole) {
+            validHistory.push(msg)
+            nextExpectedRole = nextExpectedRole === 'user' ? 'model' : 'user'
+          }
+        }
+        
+        // History must end with a 'model' turn to be valid before we send the next 'user' message
+        if (validHistory.length > 0 && validHistory[validHistory.length - 1].role === 'user') {
+          validHistory.pop()
+        }
 
         chatRef.current = ai.chats.create({
           model: 'gemini-3-flash-preview',
           config: {
             systemInstruction
           },
-          history: history.length > 0 ? history : undefined
+          history: validHistory.length > 0 ? validHistory : undefined
         })
       } catch (err) {
         console.error("Failed to fetch context, falling back to default", err)

@@ -17,6 +17,7 @@ export function Profile() {
     height: '',
     weight: '',
     bodyFat: '',
+    muscleMass: '',
     goal: '',
     diet: ''
   })
@@ -29,6 +30,7 @@ export function Profile() {
         height: user.user_metadata.height || '',
         weight: user.user_metadata.weight || '',
         bodyFat: user.user_metadata.bodyFat || '',
+        muscleMass: user.user_metadata.muscleMass || '',
         goal: user.user_metadata.goal || '',
         diet: user.user_metadata.diet || ''
       })
@@ -51,6 +53,7 @@ export function Profile() {
           height: formData.height,
           weight: formData.weight,
           bodyFat: formData.bodyFat,
+          muscleMass: formData.muscleMass,
           goal: formData.goal,
           diet: formData.diet
         }
@@ -113,9 +116,15 @@ export function Profile() {
                 <label className="text-sm font-medium">น้ำหนัก (กก.)</label>
                 <Input type="number" name="weight" placeholder="เช่น 70" value={formData.weight} onChange={handleChange} />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">เปอร์เซ็นต์ไขมันโดยประมาณ (%)</label>
-                <Input type="number" name="bodyFat" placeholder="เช่น 15" value={formData.bodyFat} onChange={handleChange} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">เปอร์เซ็นต์ไขมันโดยประมาณ (%)</label>
+                  <Input type="number" name="bodyFat" placeholder="เช่น 15" value={formData.bodyFat} onChange={handleChange} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">เปอร์เซ็นต์กล้ามเนื้อรวม (%)</label>
+                  <Input type="number" name="muscleMass" placeholder="เช่น 45" value={formData.muscleMass} onChange={handleChange} />
+                </div>
               </div>
             </div>
 
