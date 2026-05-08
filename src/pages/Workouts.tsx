@@ -100,11 +100,72 @@ export function Workouts() {
     navigate('/workouts/new', { state: { editWorkout: workout } })
   }
 
+  const exportLogs = (format: 'json' | 'csv') => {
+    if (!workouts || workouts.length === 0) {
+      toast.error('ไม่มีข้อมูลให้ออก (No data to export)')
+      return
+    }
+
+    if (format === 'json') {
+      const dataStr = JSON.stringify(workouts, null, 2)
+      const blob = new Blob([dataStr], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `liftlog_workouts_${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('ส่งออก JSON สำเร็จแล้ว')
+    } else {
+      let csvContent = "Date,Template Name,Notes,Exercise Name,Set Number,Reps,Weight,Is Dropset,Set Notes\n"
+      
+      workouts.forEach(workout => {
+         const date = new Date(workout.date).toISOString().split('T')[0]
+         const templateName = workout.workout_templates ? (Array.isArray(workout.workout_templates) ? workout.workout_templates[0]?.name : workout.workout_templates.name) : 'Custom'
+         const wNotes = (workout.notes || '').replace(/"/g, '""').replace(/\n/g, ' ')
+         
+         if (!workout.workout_sessions || workout.workout_sessions.length === 0) {
+            csvContent += `"${date}","${templateName}","${wNotes}","","","","","",""\n`
+         } else {
+            workout.workout_sessions.forEach((session: any) => {
+               const exName = session.exercises ? (Array.isArray(session.exercises) ? session.exercises[0]?.name : session.exercises.name) : 'Unknown'
+               const setNum = session.sets || ''
+               const reps = session.reps || ''
+               const weight = session.weight || ''
+               const isDropset = session.is_dropset ? 'Yes' : 'No'
+               const sNotes = (session.notes || '').replace(/"/g, '""').replace(/\n/g, ' ')
+               
+               csvContent += `"${date}","${templateName}","${wNotes}","${exName}","${setNum}","${reps}","${weight}","${isDropset}","${sNotes}"\n`
+            })
+         }
+      })
+      
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `liftlog_workouts_${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('ส่งออก CSV สำเร็จแล้ว')
+    }
+  }
+
   return (
     <div className="space-y-6 pb-10">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">My Workouts</h1>
-        <p className="text-muted-foreground mt-2">Log and view your past workout sessions.</p>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">My Workouts</h1>
+          <p className="text-muted-foreground mt-2">Log and view your past workout sessions.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => exportLogs('csv')} className="text-xs border-border text-muted-foreground hover:text-foreground">
+            Export CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportLogs('json')} className="text-xs border-border text-muted-foreground hover:text-foreground">
+            Export JSON
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4">

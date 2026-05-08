@@ -3,7 +3,7 @@ import { GoogleGenAI } from '@google/genai'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
-import { Send, Bot, User, Loader2, Activity } from 'lucide-react'
+import { Send, Bot, User, Loader2, Activity, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import Markdown from 'react-markdown'
 import { motion } from 'motion/react'
@@ -292,32 +292,54 @@ ${workoutContext}
   )
 }
 
+function MessageBubble({ message }: { message: Message }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message.content)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+    >
+      {message.role === 'model' && (
+        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+          <Bot className="w-4 h-4 text-primary" />
+        </div>
+      )}
+      
+      <div className={`group relative max-w-[85%] rounded-2xl px-4 py-3 ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted/50 border border-border text-foreground'}`}>
+        {message.role === 'user' ? (
+          <div className="whitespace-pre-wrap text-[15px]">{message.content}</div>
+        ) : (
+          <>
+            <div className="markdown-body text-[15px] leading-relaxed pt-1">
+              <Markdown>{message.content}</Markdown>
+            </div>
+            <button 
+              onClick={handleCopy}
+              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background border border-border shadow-sm p-1.5 rounded-md text-muted-foreground hover:text-foreground"
+              title="คัดลอกคำตอบ"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+          </>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
 function ScrollArea({ messages, isLoading, scrollRef }: { messages: Message[], isLoading: boolean, scrollRef: any }) {
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-6" ref={scrollRef}>
       {messages.map((message) => (
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          key={message.id} 
-          className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-        >
-          {message.role === 'model' && (
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-              <Bot className="w-4 h-4 text-primary" />
-            </div>
-          )}
-          
-          <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted/50 border border-border text-foreground'}`}>
-            {message.role === 'user' ? (
-              <div className="whitespace-pre-wrap text-[15px]">{message.content}</div>
-            ) : (
-              <div className="markdown-body text-[15px] leading-relaxed">
-                <Markdown>{message.content}</Markdown>
-              </div>
-            )}
-          </div>
-        </motion.div>
+        <MessageBubble key={message.id} message={message} />
       ))}
       {isLoading && (
         <div className="flex gap-3 justify-start">
